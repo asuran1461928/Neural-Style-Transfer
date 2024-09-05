@@ -4,14 +4,31 @@ import numpy as np
 from PIL import Image
 
 # Load and preprocess image
-def load_and_preprocess_image(image_path, target_size=(512, 512)):
-    img = Image.open(image_path)
-    img = img.resize(target_size)  # Resize the image to a fixed size
-    img = np.array(img)
-    img = tf.convert_to_tensor(img, dtype=tf.float32)
-    img = tf.image.convert_image_dtype(img, tf.float32)
-    img = img[tf.newaxis, :]  # Add a batch dimension
-    return img
+def load_and_preprocess_image(image_file, target_size=(512, 512)):
+    try:
+        # Open the image file
+        img = Image.open(image_file)
+        
+        # Convert the image to RGB if it's not already in that format
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+        
+        # Resize the image to the target size
+        img = img.resize(target_size)
+        
+        # Convert the image to a numpy array and then to a tensor
+        img = np.array(img)
+        img = tf.convert_to_tensor(img, dtype=tf.float32)
+        
+        # Normalize the image pixels to the range [0, 1]
+        img = tf.image.convert_image_dtype(img, tf.float32)
+        
+        # Add a batch dimension (required for the model)
+        img = img[tf.newaxis, :]
+        return img
+    except Exception as e:
+        st.error(f"Error loading image: {str(e)}")
+        return None
 
 # Deprocess image
 def deprocess_image(image):
@@ -100,20 +117,21 @@ if content_image_file and style_image_file:
     content_image = load_and_preprocess_image(content_image_file)
     style_image = load_and_preprocess_image(style_image_file)
 
-    # Clamp content and style images to [0, 1]
-    content_image = tf.clip_by_value(content_image, clip_value_min=0.0, clip_value_max=1.0)
-    style_image = tf.clip_by_value(style_image, clip_value_min=0.0, clip_value_max=1.0)
+    if content_image is not None and style_image is not None:
+        # Clamp content and style images to [0, 1]
+        content_image = tf.clip_by_value(content_image, clip_value_min=0.0, clip_value_max=1.0)
+        style_image = tf.clip_by_value(style_image, clip_value_min=0.0, clip_value_max=1.0)
 
-    st.image(content_image[0].numpy(), caption="Content Image", use_column_width=True)
-    st.image(style_image[0].numpy(), caption="Style Image", use_column_width=True)
+        st.image(content_image[0].numpy(), caption="Content Image", use_column_width=True)
+        st.image(style_image[0].numpy(), caption="Style Image", use_column_width=True)
 
-    if st.button("Run Style Transfer"):
-        generated_image = neural_style_transfer(content_image, style_image)
-        
-        # Clamp the generated image to [0, 1] before displaying
-        generated_image = tf.clip_by_value(generated_image, clip_value_min=0.0, clip_value_max=1.0)
-        st.image(generated_image[0].numpy(), caption="Generated Image", use_column_width=True)
+        if st.button("Run Style Transfer"):
+            generated_image = neural_style_transfer(content_image, style_image)
+            
+            # Clamp the generated image to [0, 1] before displaying
+            generated_image = tf.clip_by_value(generated_image, clip_value_min=0.0, clip_value_max=1.0)
+            st.image(generated_image[0].numpy(), caption="Generated Image", use_column_width=True)
 
-        # Post-process the generated image and display
-        final_image = deprocess_image(generated_image[0])
-        st.image(final_image, caption="Final Generated Image", use_column_width=True)
+            # Post-process the generated image and display
+            final_image = deprocess_image(generated_image[0])
+            st.image(final_image, caption="Final Generated Image", use_column_width=True)
