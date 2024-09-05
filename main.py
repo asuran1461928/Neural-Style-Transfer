@@ -2,35 +2,32 @@ import streamlit as st
 import tensorflow as tf
 import numpy as np
 from PIL import Image
+import matplotlib.pyplot as plt
 
-# Helper function to load and preprocess image
-def load_and_preprocess_image(image_path, max_dim=512):
+# Load and preprocess image
+def load_and_preprocess_image(image_path, target_size=(512, 512)):
     img = Image.open(image_path)
+    img = img.resize(target_size)  # Resize the image to a fixed size
     img = np.array(img)
+    img = tf.convert_to_tensor(img, dtype=tf.float32)
     img = tf.image.convert_image_dtype(img, tf.float32)
-    
-    shape = tf.cast(tf.shape(img)[:-1], tf.float32)
-    long_dim = max(shape)
-    scale = max_dim / long_dim
-    new_shape = tf.cast(shape * scale, tf.int32)
-    
-    img = tf.image.resize(img, new_shape)
-    img = img[tf.newaxis, :]
+    img = img[tf.newaxis, :]  # Add a batch dimension
     return img
 
-# Load VGG19 model and select the layers for style and content
+# Define the model
 def get_model():
     vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet')
     vgg.trainable = False
     
-    content_layers = ['block5_conv2']
     style_layers = ['block1_conv1', 'block2_conv1', 'block3_conv1', 'block4_conv1', 'block5_conv1']
-    outputs = [vgg.get_layer(name).output for name in (style_layers + content_layers)]
+    content_layers = ['block5_conv2']
     
-    return tf.keras.Model([vgg.input], outputs), style_layers, content_layers
+    outputs = [vgg.get_layer(name).output for name in (style_layers + content_layers)]
+    model = tf.keras.Model([vgg.input], outputs)
+    
+    return model, style_layers, content_layers
 
-# Define the style and content losses
-# Updated compute_loss function
+# Define the compute_loss function
 def compute_loss(style_outputs, content_outputs, generated_style_outputs, generated_content_outputs, style_weight=1e-2, content_weight=1e4):
     # Calculate the style loss
     style_loss = tf.add_n([tf.reduce_mean((generated_style_outputs[layer] - style_outputs[layer]) ** 2) for layer in style_outputs])
@@ -44,9 +41,11 @@ def compute_loss(style_outputs, content_outputs, generated_style_outputs, genera
     total_loss = style_loss + content_loss
     return total_loss
 
-# Updated neural_style_transfer function
+# Neural Style Transfer function
 def neural_style_transfer(content_image, style_image, num_iterations=1000, style_weight=1e-2, content_weight=1e4):
-    tf.keras.backend.clear_session()  # Reset the TensorFlow graph
+    # Reset the TensorFlow graph
+    tf.keras.backend.clear_session()
+    
     model, style_layers, content_layers = get_model()
     
     # Extract content and style outputs from the images
@@ -80,23 +79,20 @@ def neural_style_transfer(content_image, style_image, num_iterations=1000, style
     
     return generated_image
 
-
-
 # Streamlit interface
 st.title("Neural Style Transfer")
+st.write("Upload a content image and a style image to generate a stylized image.")
 
-st.sidebar.header("Settings")
-num_iterations = st.sidebar.slider("Iterations", min_value=500, max_value=2000, step=100, value=1000)
-style_weight = st.sidebar.slider("Style Weight", min_value=1e-5, max_value=1e-1, step=1e-5, value=1e-2)
-content_weight = st.sidebar.slider("Content Weight", min_value=1e2, max_value=1e5, step=1e3, value=1e4)
-
-content_image_file = st.file_uploader("Upload Content Image", type=["jpg", "jpeg", "png"])
-style_image_file = st.file_uploader("Upload Style Image", type=["jpg", "jpeg", "png"])
+content_image_file = st.file_uploader("Upload Content Image", type=["jpg", "png"])
+style_image_file = st.file_uploader("Upload Style Image", type=["jpg", "png"])
 
 if content_image_file and style_image_file:
     content_image = load_and_preprocess_image(content_image_file)
     style_image = load_and_preprocess_image(style_image_file)
 
+    st.image(content_image[0].numpy(), caption="Content Image", use_column_width=True)
+    st.image(style_image[0].numpy(), caption="Style Image", use_column_width=True)
+
     if st.button("Run Style Transfer"):
-        generated_image = neural_style_transfer(content_image, style_image, num_iterations, style_weight, content_weight)
+        generated_image = neural_style_transfer(content_image, style_image)
         st.image(generated_image[0].numpy(), caption="Generated Image", use_column_width=True)
