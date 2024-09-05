@@ -30,25 +30,35 @@ def get_model():
     return tf.keras.Model([vgg.input], outputs), style_layers, content_layers
 
 # Define the style and content losses
-def compute_loss(model, style_outputs, content_outputs, style_weight=1e-2, content_weight=1e4):
-    style_weight_per_layer = 1.0 / len(style_outputs)
-    style_loss = tf.add_n([style_weight_per_layer * tf.reduce_mean((style_outputs[name] - model.outputs[name]) ** 2) for name in style_outputs.keys()])
-    content_loss = tf.reduce_mean((content_outputs['block5_conv2'] - model.outputs['block5_conv2']) ** 2)
+# Updated compute_loss function
+def compute_loss(style_outputs, content_outputs, generated_style_outputs, generated_content_outputs, style_weight=1e-2, content_weight=1e4):
+    # Calculate the style loss
+    style_loss = tf.add_n([tf.reduce_mean((generated_style_outputs[layer] - style_outputs[layer]) ** 2) for layer in style_outputs])
+    style_loss *= style_weight / len(style_outputs)
     
-    return style_weight * style_loss + content_weight * content_loss
+    # Calculate the content loss
+    content_loss = tf.reduce_mean((generated_content_outputs['block5_conv2'] - content_outputs['block5_conv2']) ** 2)
+    content_loss *= content_weight
+    
+    # Total loss
+    total_loss = style_loss + content_loss
+    return total_loss
 
-# Run the style transfer algorithm
+# Updated neural_style_transfer function
 def neural_style_transfer(content_image, style_image, num_iterations=1000, style_weight=1e-2, content_weight=1e4):
     model, style_layers, content_layers = get_model()
     
+    # Extract content and style outputs from the images
     content_targets = model(content_image)
     content_outputs = {content_layers[0]: content_targets[len(style_layers):][0]}
     
     style_targets = model(style_image)
     style_outputs = {style_layers[i]: style_targets[i] for i in range(len(style_layers))}
     
+    # Initialize the generated image as a variable
     generated_image = tf.Variable(content_image)
     
+    # Optimizer
     optimizer = tf.optimizers.Adam(learning_rate=0.02)
     
     for i in range(num_iterations):
@@ -57,8 +67,10 @@ def neural_style_transfer(content_image, style_image, num_iterations=1000, style
             generated_style_outputs = {style_layers[i]: model_outputs[i] for i in range(len(style_layers))}
             generated_content_outputs = {content_layers[0]: model_outputs[len(style_layers):][0]}
             
-            loss = compute_loss(generated_style_outputs, generated_content_outputs, style_outputs, content_outputs, style_weight, content_weight)
+            # Calculate loss using the updated compute_loss function
+            loss = compute_loss(style_outputs, content_outputs, generated_style_outputs, generated_content_outputs, style_weight, content_weight)
         
+        # Apply gradients
         grads = tape.gradient(loss, generated_image)
         optimizer.apply_gradients([(grads, generated_image)])
         
@@ -66,6 +78,7 @@ def neural_style_transfer(content_image, style_image, num_iterations=1000, style
             st.write(f"Iteration {i}: loss = {loss}")
     
     return generated_image
+
 
 
 # Streamlit interface
