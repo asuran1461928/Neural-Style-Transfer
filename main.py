@@ -90,9 +90,16 @@ if content_image_file and style_image_file:
     content_image = load_and_preprocess_image(content_image_file)
     style_image = load_and_preprocess_image(style_image_file)
 
+    # Clamp content and style images to [0, 1]
+    content_image = tf.clip_by_value(content_image, clip_value_min=0.0, clip_value_max=1.0)
+    style_image = tf.clip_by_value(style_image, clip_value_min=0.0, clip_value_max=1.0)
+
     st.image(content_image[0].numpy(), caption="Content Image", use_column_width=True)
     st.image(style_image[0].numpy(), caption="Style Image", use_column_width=True)
 
     if st.button("Run Style Transfer"):
         generated_image = neural_style_transfer(content_image, style_image)
+        
+        # Clamp the generated image to [0, 1] before displaying
+        generated_image = tf.clip_by_value(generated_image, clip_value_min=0.0, clip_value_max=1.0)
         st.image(generated_image[0].numpy(), caption="Generated Image", use_column_width=True)
