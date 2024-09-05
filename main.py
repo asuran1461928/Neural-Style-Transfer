@@ -46,6 +46,7 @@ def compute_loss(style_outputs, content_outputs, generated_style_outputs, genera
 
 # Updated neural_style_transfer function
 def neural_style_transfer(content_image, style_image, num_iterations=1000, style_weight=1e-2, content_weight=1e4):
+    tf.keras.backend.clear_session()  # Reset the TensorFlow graph
     model, style_layers, content_layers = get_model()
     
     # Extract content and style outputs from the images
