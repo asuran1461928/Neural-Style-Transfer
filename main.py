@@ -26,8 +26,8 @@ def load_and_preprocess_image(image_file, target_size=(512, 512)):
 def deprocess_image(image):
     image = image.numpy()
     image = image.squeeze()
-    image = np.clip(image, 0, 1)
-    image = (image * 255).astype(np.uint8)
+    image = np.clip(image, 0, 1)  # Ensure values are between 0 and 1
+    image = (image * 255).astype(np.uint8)  # Convert to 8-bit image
     return Image.fromarray(image)
 
 # Define the model
@@ -94,15 +94,23 @@ if content_image_file and style_image_file:
     style_image = load_and_preprocess_image(style_image_file)
 
     if content_image is not None and style_image is not None:
-        st.image(content_image[0].numpy(), caption="Content Image", use_column_width=True)
-        st.image(style_image[0].numpy(), caption="Style Image", use_column_width=True)
+        # Display the images for debugging
+        st.write("Content Image (Debug):")
+        content_image_display = tf.clip_by_value(content_image[0], 0.0, 1.0)
+        st.image(content_image_display.numpy(), caption="Content Image", use_column_width=True)
+        
+        st.write("Style Image (Debug):")
+        style_image_display = tf.clip_by_value(style_image[0], 0.0, 1.0)
+        st.image(style_image_display.numpy(), caption="Style Image", use_column_width=True)
 
         if st.button("Run Style Transfer"):
             generated_image = neural_style_transfer(content_image, style_image)
             
             # Clamp the generated image to [0, 1] before displaying
             generated_image_clamped = tf.clip_by_value(generated_image, 0.0, 1.0)
+            st.write("Generated Image (Debug):")
             st.image(generated_image_clamped[0].numpy(), caption="Generated Image", use_column_width=True)
 
             final_image = deprocess_image(generated_image_clamped[0])
+            st.write("Final Generated Image:")
             st.image(final_image, caption="Final Generated Image", use_column_width=True)
