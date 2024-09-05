@@ -41,8 +41,11 @@ def compute_loss(model, style_outputs, content_outputs, style_weight=1e-2, conte
 def neural_style_transfer(content_image, style_image, num_iterations=1000, style_weight=1e-2, content_weight=1e4):
     model, style_layers, content_layers = get_model()
     
-    content_outputs = model(content_image)['block5_conv2']
-    style_outputs = {name: model(style_image)[name] for name in style_layers}
+    content_targets = model(content_image)
+    content_outputs = {content_layers[0]: content_targets[len(style_layers):][0]}
+    
+    style_targets = model(style_image)
+    style_outputs = {style_layers[i]: style_targets[i] for i in range(len(style_layers))}
     
     generated_image = tf.Variable(content_image)
     
@@ -51,7 +54,10 @@ def neural_style_transfer(content_image, style_image, num_iterations=1000, style
     for i in range(num_iterations):
         with tf.GradientTape() as tape:
             model_outputs = model(generated_image)
-            loss = compute_loss(model, style_outputs, content_outputs, style_weight, content_weight)
+            generated_style_outputs = {style_layers[i]: model_outputs[i] for i in range(len(style_layers))}
+            generated_content_outputs = {content_layers[0]: model_outputs[len(style_layers):][0]}
+            
+            loss = compute_loss(generated_style_outputs, generated_content_outputs, style_outputs, content_outputs, style_weight, content_weight)
         
         grads = tape.gradient(loss, generated_image)
         optimizer.apply_gradients([(grads, generated_image)])
@@ -60,6 +66,7 @@ def neural_style_transfer(content_image, style_image, num_iterations=1000, style
             st.write(f"Iteration {i}: loss = {loss}")
     
     return generated_image
+
 
 # Streamlit interface
 st.title("Neural Style Transfer")
